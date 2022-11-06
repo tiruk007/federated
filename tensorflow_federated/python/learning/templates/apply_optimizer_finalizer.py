@@ -19,6 +19,7 @@
 """Abstractions for finalization in learning algorithms."""
 
 from collections.abc import Callable
+import functools
 from typing import Union
 
 import tensorflow as tf
@@ -35,6 +36,7 @@ from tensorflow_federated.python.learning.models import model_weights
 from tensorflow_federated.python.learning.optimizers import keras_optimizer
 from tensorflow_federated.python.learning.optimizers import optimizer as optimizer_base
 from tensorflow_federated.python.learning.templates import finalizers
+from tensorflow_federated.python.tensorflow_libs import tensor_utils
 
 
 def _build_tff_optimizer_initialize_and_next(
@@ -54,7 +56,13 @@ def _build_tff_optimizer_initialize_and_next(
                                          model_weights_type.trainable,
                                          model_weights_type.trainable)
   def next_fn(optimizer_state, trainable_weights, update):
-    return optimizer.next(optimizer_state, trainable_weights, update)
+    _, has_non_finite = tensor_utils.zero_all_if_any_non_finite(update)
+    return tf.cond(
+        tf.equal(has_non_finite, 1),
+        # Do nothing if there are nans/infs in the update.
+        true_fn=lambda: (optimizer_state, trainable_weights),
+        false_fn=functools.partial(optimizer.next, optimizer_state,
+                                   trainable_weights, update))
 
   return init_fn, next_fn
 
@@ -82,6 +90,11 @@ def _build_keras_optimizer_initialize_and_next(
                                          model_weights_type.trainable)
   @tf.function
   def next_fn(optimizer_state, trainable_weights, update):
+    _, has_non_finite = tensor_utils.zero_all_if_any_non_finite(update)
+    if tf.equal(has_non_finite, 1):
+      # Do nothing if there are nans/infs in the update.
+      return optimizer_state, trainable_weights
+
     with tf.init_scope():
       # Create a structure of variables that the server optimizer can update.
       trainable_variables = tf.nest.map_structure(

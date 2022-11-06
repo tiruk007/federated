@@ -250,6 +250,56 @@ class ApplyOptimizerFinalizerExecutionTest(tf.test.TestCase):
       self.assertAllClose(1.0 - 0.1 * (i + 1), weights.trainable)
       self.assertEqual((), output.measurements)
 
+  def test_keras_finalizer_execution_with_non_finite_update(self):
+    init_fn, next_fn = apply_optimizer_finalizer._build_keras_optimizer_initialize_and_next(
+        computation_types.to_type(
+            model_weights.ModelWeights(
+                trainable=[tf.float64], non_trainable=[])),
+        optimizer_fn=tf.keras.optimizers.SGD)
+
+    initial_state = init_fn()
+    test_weights = model_weights.ModelWeights(trainable=[0.0], non_trainable=[])
+
+    with self.subTest('inf'):
+      state, weights = next_fn(
+          initial_state, test_weights,
+          model_weights.ModelWeights(
+              trainable=[float('inf')], non_trainable=[]))
+      self.assertAllClose(state, initial_state)
+      self.assertAllClose(weights, test_weights)
+    with self.subTest('nan'):
+      state, weights = next_fn(
+          initial_state, test_weights,
+          model_weights.ModelWeights(
+              trainable=[float('nan')], non_trainable=[]))
+      self.assertAllClose(state, initial_state)
+      self.assertAllClose(weights, test_weights)
+
+  def test_tff_finalizer_execution_with_non_finite_update(self):
+    init_fn, next_fn = apply_optimizer_finalizer._build_tff_optimizer_initialize_and_next(
+        computation_types.to_type(
+            model_weights.ModelWeights(
+                trainable=[tf.float64], non_trainable=[])),
+        optimizer=sgdm.build_sgdm(1.0))
+
+    initial_state = init_fn()
+    test_weights = model_weights.ModelWeights(trainable=[0.0], non_trainable=[])
+
+    with self.subTest('inf'):
+      state, weights = next_fn(
+          initial_state, test_weights,
+          model_weights.ModelWeights(
+              trainable=[float('inf')], non_trainable=[]))
+      self.assertAllClose(state, initial_state)
+      self.assertAllClose(weights, test_weights)
+    with self.subTest('nan'):
+      state, weights = next_fn(
+          initial_state, test_weights,
+          model_weights.ModelWeights(
+              trainable=[float('nan')], non_trainable=[]))
+      self.assertAllClose(state, initial_state)
+      self.assertAllClose(weights, test_weights)
+
   def test_execution_with_stateful_tff_optimizer(self):
     momentum = 0.5
     finalizer = apply_optimizer_finalizer.build_apply_optimizer_finalizer(

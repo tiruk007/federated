@@ -110,6 +110,15 @@ py_test(
     ],
 )
 
+py_library(
+    name = "reconstruction_model",
+    srcs = ["reconstruction_model.py"],
+    deps = [
+        ":model_weights",
+        "//tensorflow_federated/python/core/impl/types:computation_types",
+    ],
+)
+
 py_test(
     name = "serialization_test",
     srcs = ["serialization_test.py"],
