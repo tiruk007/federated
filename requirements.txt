@@ -36,6 +36,9 @@ jaxlib==0.3.14
 jax==0.3.14
 numpy~=1.21
 portpicker~=1.5
+# The version of this dependency should match the version in
+# https://github.com/tensorflow/federated/blob/main/WORKSPACE.
+protobuf>=4.0,==4.21.*
 pytype==2022.12.15
 semantic-version~=2.6
 tensorflow-compression~=2.11.0
